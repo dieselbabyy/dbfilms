@@ -1,0 +1,13 @@
+venv/
+*.log
+node_modules/
+.env
+watcharr_export.json
+dbfilms.db
+data/
+data/img/
+data/img/backdrops/
+*.sqlite
+*.sqlite3
+*.csv
+import_debug.log
