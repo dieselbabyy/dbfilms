@@ -11,6 +11,7 @@ $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
 $sort = $_GET['sort'] ?? 'title';
 $status = $_GET['status'] ?? '';
+$search = $_GET['search'] ?? '';
 $offset = (int)($_GET['offset'] ?? 0);
 $limit = 10;
 
@@ -24,8 +25,12 @@ if ($status && in_array($status, ['watched', 'watching', 'plan_to_watch', ''])) 
     $where = $status ? 'WHERE watch_status = ?' : 'WHERE watch_status IS NULL';
     if ($status) $params[] = $status;
 }
+if ($search) {
+    $where .= ($where ? ' AND ' : 'WHERE ') . 'title LIKE ?';
+    $params[] = "%$search%";
+}
 
-$query = "SELECT tmdb_id, title, poster_path FROM entries $where ORDER BY $sort $order LIMIT ? OFFSET ?";
+$query = "SELECT tmdb_id, title, poster_path, COALESCE(rating, 0) AS rating FROM entries $where ORDER BY $sort $order LIMIT ? OFFSET ?";
 $params[] = $limit;
 $params[] = $offset;
 
@@ -36,6 +41,7 @@ $entries = $stmt->fetchAll(PDO::FETCH_ASSOC);
 // Strip /data/img/ prefix
 foreach ($entries as &$entry) {
     $entry['poster_path'] = str_replace('/data/img/', '', $entry['poster_path'] ?? '');
+    $entry['rating'] = (int)$entry['rating']; // Ensure integer
 }
 unset($entry);
 

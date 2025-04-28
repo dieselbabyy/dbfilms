@@ -47,10 +47,12 @@ $entries = $stmt->fetchAll(PDO::FETCH_ASSOC);
             background: #e0e0e0; 
             margin: 2rem 0; 
             border: 1px solid #ccc; 
+            display: block; 
         }
         #loader.hidden { display: none; }
         .star-rating { color: #FFD700; }
-        .section { min-height: 100vh; } /* Ensure enough scrollable space */
+        .section { min-height: 100vh; }
+        .spacer { height: 1000px; } /* Increased for more scroll room */
     </style>
 </head>
 <body>
@@ -93,7 +95,8 @@ $entries = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 <?php foreach ($entries as $entry): ?>
                     <?php
                     $poster_path = str_replace('/data/img/', '', $entry['poster_path'] ?? '');
-                    $stars = round(($entry['rating'] ?? 0) / 20);
+                    $rating = isset($entry['rating']) ? (int)$entry['rating'] : 0;
+                    $stars = round($rating / 20);
                     ?>
                     <div class="column is-one-third">
                         <div class="card">
@@ -104,13 +107,14 @@ $entries = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             </div>
                             <div class="card-content">
                                 <p class="title is-5"><a href="/templates/entry.php?id=<?php echo htmlspecialchars($entry['tmdb_id']); ?>"><?php echo htmlspecialchars($entry['title']); ?></a></p>
-                                <p class="star-rating"><?php echo str_repeat('★', $stars) . str_repeat('☆', 5 - $stars); ?> (<?php echo $entry['rating'] ?? 'N/A'; ?>/100)</p>
+                                <p class="star-rating"><?php echo str_repeat('★', $stars) . str_repeat('☆', 5 - $stars); ?> (<?php echo $rating; ?>/100)</p>
                             </div>
                         </div>
                     </div>
                 <?php endforeach; ?>
             </div>
-            <div id="loader" class="hidden">Loading...</div>
+            <div id="loader">Loading...</div>
+            <div class="spacer"></div>
         </div>
     </section>
     <script>
@@ -149,7 +153,8 @@ $entries = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     }
                     const grid = document.getElementById('movie-grid');
                     data.forEach(entry => {
-                        const stars = Math.round((entry.rating || 0) / 20);
+                        const rating = entry.rating !== null ? parseInt(entry.rating) : 0;
+                        const stars = Math.round(rating / 20);
                         const div = document.createElement('div');
                         div.className = 'column is-one-third';
                         div.innerHTML = `
@@ -161,7 +166,7 @@ $entries = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                 </div>
                                 <div class="card-content">
                                     <p class="title is-5"><a href="/templates/entry.php?id=${entry.tmdb_id}">${entry.title}</a></p>
-                                    <p class="star-rating">${'★'.repeat(stars)}${'☆'.repeat(5 - stars)} (${entry.rating || 'N/A'}/100)</p>
+                                    <p class="star-rating">${'★'.repeat(stars)}${'☆'.repeat(5 - stars)} (${rating}/100)</p>
                                 </div>
                             </div>
                         `;
@@ -169,8 +174,10 @@ $entries = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     });
                     offset += data.length;
                     loading = false;
-                    loader.classList.add('hidden', data.length < 10);
-                    console.log(`Loaded ${data.length} movies, new offset: ${offset}`);
+                    if (data.length < 10) {
+                        loader.classList.add('hidden');
+                        console.log('No more data to load');
+                    }
                 })
                 .catch(error => {
                     console.error('Error loading more movies:', error);
@@ -185,7 +192,7 @@ $entries = $stmt->fetchAll(PDO::FETCH_ASSOC);
             if (entry.isIntersecting && !loading) {
                 loadMoreMovies();
             }
-        }, { threshold: 0.1, rootMargin: '300px' });
+        }, { threshold: 0.1, rootMargin: '1000px' });
 
         console.log('Observing loader element');
         const loader = document.getElementById('loader');
