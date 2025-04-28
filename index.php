@@ -1,60 +1,27 @@
-<?php
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
-require 'vendor/autoload.php';
-$dotenv = Dotenv\Dotenv::createImmutable(__DIR__);
-$dotenv->load();
-$db = new PDO('sqlite:/home/dbfilms/htdocs/dbfilms.diesel.baby/dbfilms.db');
-$db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-
-$sort = $_GET['sort'] ?? 'title';
-$status = $_GET['status'] ?? '';
-$search = $_GET['search'] ?? '';
-$allowed_sorts = ['title', 'release_date', 'updated_at', 'rating'];
-$sort = in_array($sort, $allowed_sorts) ? $sort : 'title';
-$order = ($sort === 'title') ? 'ASC' : 'DESC';
-
-$where = '';
-$params = [];
-if ($status && in_array($status, ['watched', 'watching', 'plan_to_watch', ''])) {
-    $where = $status ? 'WHERE watch_status = ?' : 'WHERE watch_status IS NULL';
-    if ($status) $params[] = $status;
-}
-if ($search) {
-    $where .= ($where ? ' AND ' : 'WHERE ') . 'title LIKE ?';
-    $params[] = "%$search%";
-}
-
-$stmt = $db->prepare("SELECT tmdb_id, title, poster_path, rating FROM entries $where ORDER BY $sort $order LIMIT 10");
-$stmt->execute($params);
-$entries = $stmt->fetchAll(PDO::FETCH_ASSOC);
-?>
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>Movie Database</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
-    <style>
-        .card { margin-bottom: 1.5rem; }
-        .card-img { max-height: 300px; object-fit: cover; }
-        #loader { 
-            text-align: center; 
-            padding: 2rem; 
-            min-height: 100px; 
-            font-size: 1.2rem; 
-            background: #e0e0e0; 
-            margin: 2rem 0; 
-            border: 1px solid #ccc; 
-            display: block; 
-        }
-        #loader.hidden { display: none; }
-        .star-rating { color: #FFD700; }
-        .section { min-height: 100vh; }
-        .spacer { height: 1000px; } /* Increased for more scroll room */
-    </style>
-</head>
+<style>
+    .card { margin-bottom: 1.5rem; }
+    .card-img { max-height: 300px; object-fit: cover; }
+    #loader { 
+        text-align: center; 
+        padding: 2rem; 
+        min-height: 100px; 
+        font-size: 1.2rem; 
+        background: #e0e0e0; 
+        margin: 2rem auto; 
+        border: 1px solid #ccc; 
+        display: block; 
+        width: 100%; 
+        box-sizing: border-box; 
+    }
+    #loader.hidden { display: none; }
+    .star-rating { color: #FFD700; }
+    .section { min-height: 100vh; }
+    .spacer { height: 5000px; }
+    .status-icon { margin-left: 0.5rem; font-size: 1rem; }
+    .status-watched { color: #00d1b2; } /* Bulma is-success */
+    .status-watching { color: #ffdd57; } /* Bulma is-warning */
+    .status-plan { color: #dbdbdb; } /* Bulma is-light */
+</style>
 <body>
     <section class="section">
         <div class="container">
@@ -97,6 +64,23 @@ $entries = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     $poster_path = str_replace('/data/img/', '', $entry['poster_path'] ?? '');
                     $rating = isset($entry['rating']) ? (int)$entry['rating'] : 0;
                     $stars = round($rating / 20);
+                    $watch_status = $entry['watch_status'] ?? '';
+                    $status_icon = '';
+                    $status_class = '';
+                    $status_text = '';
+                    if ($watch_status === 'watched') {
+                        $status_icon = 'fa-check-circle';
+                        $status_class = 'status-watched';
+                        $status_text = 'Watched on ' . ($entry['updated_at'] ?? 'Unknown');
+                    } elseif ($watch_status === 'watching') {
+                        $status_icon = 'fa-play-circle';
+                        $status_class = 'status-watching';
+                        $status_text = 'Currently watching, started on ' . ($entry['created_at'] ?? 'Unknown');
+                    } elseif ($watch_status === 'plan_to_watch') {
+                        $status_icon = 'fa-clock';
+                        $status_class = 'status-plan';
+                        $status_text = 'Added to watchlist on ' . ($entry['created_at'] ?? 'Unknown');
+                    }
                     ?>
                     <div class="column is-one-third">
                         <div class="card">
@@ -106,8 +90,17 @@ $entries = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                 </figure>
                             </div>
                             <div class="card-content">
-                                <p class="title is-5"><a href="/templates/entry.php?id=<?php echo htmlspecialchars($entry['tmdb_id']); ?>"><?php echo htmlspecialchars($entry['title']); ?></a></p>
-                                <p class="star-rating"><?php echo str_repeat('★', $stars) . str_repeat('☆', 5 - $stars); ?> (<?php echo $rating; ?>/100)</p>
+                                <p class="title is-5">
+                                    <a href="/templates/entry.php?id=<?php echo htmlspecialchars($entry['tmdb_id']); ?>">
+                                        <?php echo htmlspecialchars($entry['title']); ?>
+                                    </a>
+                                    <?php if ($status_icon): ?>
+                                        <i class="fas <?php echo $status_icon; ?> status-icon <?php echo $status_class; ?>" title="<?php echo htmlspecialchars($status_text); ?>"></i>
+                                    <?php endif; ?>
+                                </p>
+                                <?php if ($watch_status === 'watched' && $rating > 0): ?>
+                                    <p class="star-rating"><?php echo str_repeat('★', $stars) . str_repeat('☆', 5 - $stars); ?> (<?php echo $rating; ?>/100)</p>
+                                <?php endif; ?>
                             </div>
                         </div>
                     </div>
@@ -117,6 +110,7 @@ $entries = $stmt->fetchAll(PDO::FETCH_ASSOC);
             <div class="spacer"></div>
         </div>
     </section>
+    <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
     <script>
         let offset = 10;
         let loading = false;
@@ -155,6 +149,22 @@ $entries = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     data.forEach(entry => {
                         const rating = entry.rating !== null ? parseInt(entry.rating) : 0;
                         const stars = Math.round(rating / 20);
+                        let status_icon = '';
+                        let status_class = '';
+                        let status_text = '';
+                        if (entry.watch_status === 'watched') {
+                            status_icon = 'fa-check-circle';
+                            status_class = 'status-watched';
+                            status_text = 'Watched on ' + (entry.updated_at || 'Unknown');
+                        } else if (entry.watch_status === 'watching') {
+                            status_icon = 'fa-play-circle';
+                            status_class = 'status-watching';
+                            status_text = 'Currently watching, started on ' + (entry.created_at || 'Unknown');
+                        } else if (entry.watch_status === 'plan_to_watch') {
+                            status_icon = 'fa-clock';
+                            status_class = 'status-plan';
+                            status_text = 'Added to watchlist on ' + (entry.created_at || 'Unknown');
+                        }
                         const div = document.createElement('div');
                         div.className = 'column is-one-third';
                         div.innerHTML = `
@@ -165,8 +175,11 @@ $entries = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                     </figure>
                                 </div>
                                 <div class="card-content">
-                                    <p class="title is-5"><a href="/templates/entry.php?id=${entry.tmdb_id}">${entry.title}</a></p>
-                                    <p class="star-rating">${'★'.repeat(stars)}${'☆'.repeat(5 - stars)} (${rating}/100)</p>
+                                    <p class="title is-5">
+                                        <a href="/templates/entry.php?id=${entry.tmdb_id}">${entry.title}</a>
+                                        ${status_icon ? `<i class="fas ${status_icon} status-icon ${status_class}" title="${status_text}"></i>` : ''}
+                                    </p>
+                                    ${entry.watch_status === 'watched' && rating > 0 ? `<p class="star-rating">${'★'.repeat(stars)}${'☆'.repeat(5 - stars)} (${rating}/100)</p>` : ''}
                                 </div>
                             </div>
                         `;
@@ -192,7 +205,7 @@ $entries = $stmt->fetchAll(PDO::FETCH_ASSOC);
             if (entry.isIntersecting && !loading) {
                 loadMoreMovies();
             }
-        }, { threshold: 0.1, rootMargin: '1000px' });
+        }, { threshold: 0.1, rootMargin: '1500px' });
 
         console.log('Observing loader element');
         const loader = document.getElementById('loader');
@@ -202,23 +215,21 @@ $entries = $stmt->fetchAll(PDO::FETCH_ASSOC);
             observer.observe(loader);
         }
 
-        // Fallback: Check if loader is in view on load
         window.addEventListener('load', () => {
             if (!loader) return;
             const rect = loader.getBoundingClientRect();
             console.log('Loader on load - Top:', rect.top, 'Window height:', window.innerHeight, 'Bottom:', rect.bottom);
-            if (rect.top < window.innerHeight && rect.bottom > 0 && !loading) {
+            if (rect.top <= window.innerHeight && rect.bottom >= 0 && !loading) {
                 console.log('Loader in view on load, triggering loadMoreMovies');
                 loadMoreMovies();
             }
         });
 
-        // Fallback: Manual scroll check
         window.addEventListener('scroll', () => {
             if (!loader) return;
             const rect = loader.getBoundingClientRect();
             console.log('Scroll - Loader top:', rect.top, 'Window height:', window.innerHeight, 'Bottom:', rect.bottom);
-            if (rect.top < window.innerHeight && rect.bottom > 0 && !loading) {
+            if (rect.top <= window.innerHeight && rect.bottom >= 0 && !loading) {
                 console.log('Loader in view on scroll, triggering loadMoreMovies');
                 loadMoreMovies();
             }

@@ -30,7 +30,7 @@ if ($search) {
     $params[] = "%$search%";
 }
 
-$query = "SELECT tmdb_id, title, poster_path, COALESCE(rating, 0) AS rating FROM entries $where ORDER BY $sort $order LIMIT ? OFFSET ?";
+$query = "SELECT tmdb_id, title, poster_path, COALESCE(rating, 0) AS rating, watch_status, created_at, updated_at FROM entries $where ORDER BY $sort $order LIMIT ? OFFSET ?";
 $params[] = $limit;
 $params[] = $offset;
 
@@ -41,7 +41,7 @@ $entries = $stmt->fetchAll(PDO::FETCH_ASSOC);
 // Strip /data/img/ prefix
 foreach ($entries as &$entry) {
     $entry['poster_path'] = str_replace('/data/img/', '', $entry['poster_path'] ?? '');
-    $entry['rating'] = (int)$entry['rating']; // Ensure integer
+    $entry['rating'] = (int)$entry['rating'];
 }
 unset($entry);
 
