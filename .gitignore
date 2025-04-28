@@ -17,3 +17,5 @@ update_json.py
 validate_json.py
 vendor/
 logs/
+debug_summary.txt
+vendor/composer/*
