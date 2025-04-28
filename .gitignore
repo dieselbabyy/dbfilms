@@ -2,6 +2,7 @@ venv/
 *.log
 node_modules/
 .env
+*.bak
 watcharr_export.json
 dbfilms.db
 data/
@@ -11,3 +12,8 @@ data/img/backdrops/
 *.sqlite3
 *.csv
 import_debug.log
+transform.py
+update_json.py
+validate_json.py
+vendor/
+logs/
