@@ -1,27 +1,73 @@
-<style>
-    .card { margin-bottom: 1.5rem; }
-    .card-img { max-height: 300px; object-fit: cover; }
-    #loader { 
-        text-align: center; 
-        padding: 2rem; 
-        min-height: 100px; 
-        font-size: 1.2rem; 
-        background: #e0e0e0; 
-        margin: 2rem auto; 
-        border: 1px solid #ccc; 
-        display: block; 
-        width: 100%; 
-        box-sizing: border-box; 
-    }
-    #loader.hidden { display: none; }
-    .star-rating { color: #FFD700; }
-    .section { min-height: 100vh; }
-    .spacer { height: 5000px; }
-    .status-icon { margin-left: 0.5rem; font-size: 1rem; }
-    .status-watched { color: #00d1b2; } /* Bulma is-success */
-    .status-watching { color: #ffdd57; } /* Bulma is-warning */
-    .status-plan { color: #dbdbdb; } /* Bulma is-light */
-</style>
+<?php
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+require 'vendor/autoload.php';
+$dotenv = Dotenv\Dotenv::createImmutable(__DIR__);
+$dotenv->load();
+$db = new PDO('sqlite:/home/dbfilms/htdocs/dbfilms.diesel.baby/dbfilms.db');
+$db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+
+$sort = $_GET['sort'] ?? 'title';
+$status = $_GET['status'] ?? '';
+$search = $_GET['search'] ?? '';
+$allowed_sorts = ['title', 'release_date', 'updated_at', 'rating'];
+$sort = in_array($sort, $allowed_sorts) ? $sort : 'title';
+$order = ($sort === 'title') ? 'ASC' : 'DESC';
+
+$where = '';
+$params = [];
+if ($status && in_array($status, ['watched', 'watching', 'plan_to_watch', ''))) {
+    $where = $status ? 'WHERE watch_status = ?' : 'WHERE watch_status IS NULL';
+    if ($status) $params[] = $status;
+}
+if ($search) {
+    $where .= ($where ? ' AND ' : 'WHERE ') . 'title LIKE ?';
+    $params[] = "%$search%";
+}
+
+$stmt = $db->prepare("SELECT tmdb_id, title, poster_path, COALESCE(rating, 0) AS rating, watch_status, created_at, updated_at FROM entries $where ORDER BY $sort $order LIMIT 10");
+$stmt->execute($params);
+$entries = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Strip /data/img/ prefix
+foreach ($entries as &$entry) {
+    $entry['poster_path'] = str_replace('/data/img/', '', $entry['poster_path'] ?? '');
+}
+unset($entry);
+?>
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Movie Database</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        .card { margin-bottom: 1.5rem; }
+        .card-img { max-height: 300px; object-fit: cover; }
+        #loader { 
+            text-align: center; 
+            padding: 2rem; 
+            min-height: 100px; 
+            font-size: 1.2rem; 
+            background: #e0e0e0; 
+            margin: 2rem auto; 
+            border: 1px solid #ccc; 
+            display: block; 
+            width: 100%; 
+            box-sizing: border-box; 
+        }
+        #loader.hidden { display: none; }
+        .star-rating { color: #FFD700; }
+        .section { min-height: 100vh; }
+        .spacer { height: 5000px; }
+        .status-icon { margin-left: 0.5rem; font-size: 1rem; }
+        .status-watched { color: #00d1b2; }
+        .status-watching { color: #ffdd57; }
+        .status-plan { color: #dbdbdb; }
+    </style>
+</head>
 <body>
     <section class="section">
         <div class="container">
@@ -110,7 +156,6 @@
             <div class="spacer"></div>
         </div>
     </section>
-    <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
     <script>
         let offset = 10;
         let loading = false;
