@@ -17,7 +17,7 @@ $order = ($sort === 'title') ? 'ASC' : 'DESC';
 
 $where = '';
 $params = [];
-if ($status && in_array($status, ['watched', 'watching', 'plan_to_watch', ''))) {
+if ($status && in_array($status, ['watched', 'watching', 'plan_to_watch', ''])) {
     $where = $status ? 'WHERE watch_status = ?' : 'WHERE watch_status IS NULL';
     if ($status) $params[] = $status;
 }
